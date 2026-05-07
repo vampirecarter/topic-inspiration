@@ -10,10 +10,16 @@ on:
 jobs:
   fetch-trending-and-notify:
     runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            .github/workflows/daily-trending.yml
+          sparse-checkout-cone-mode: false
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -98,14 +104,16 @@ jobs:
                   except Exception as e:
                       continue
 
-              # 输出结果
-              print(f"::set-output name=count::{len(results)}")
+              # 输出结果 - 使用 GITHUB_OUTPUT 代替 set-output
+              with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                  f.write(f"count={len(results)}\n")
               with open("trending_results.json", "w") as f:
                   json.dump(results, f, ensure_ascii=False, indent=2)
 
           except Exception as e:
               print(f"Error: {e}")
-              print("::set-output name=count::0")
+              with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                  f.write("count=0\n")
               with open("trending_results.json", "w") as f:
                   json.dump([], f)
 
