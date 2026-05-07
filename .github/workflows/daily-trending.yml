@@ -1,0 +1,190 @@
+name: 📅 每日 GitHub Trending 推送到飞书
+
+on:
+  schedule:
+    # 每天早上 8:00 (北京时间) 执行
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+    # 支持手动触发
+
+jobs:
+  fetch-trending-and-notify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install requests beautifulsoup4 PyYAML
+
+      - name: Fetch GitHub Trending
+        id: fetch
+        run: |
+          python << 'EOF'
+          import requests
+          from bs4 import BeautifulSoup
+          import os
+          import json
+
+          # 关注的领域关键词
+          KEYWORDS = [
+              # 开发相关
+              "ios", "swift", "harmonyos", "arkts", "flutter", "react-native",
+              "swiftui", "arkui", "mobile-development",
+              # AI相关
+              "ai", "gpt", "llm", "agent", "chatgpt", "claude",
+              # 自媒体/内容相关
+              "blog", "content", "creator", "notion", "substack",
+              # 3D打印
+              "3d-print", "openscad", "cad",
+              # 育儿/教育
+              "kids", "education", "parenting", "gamification"
+          ]
+
+          # GitHub Trending API
+          url = "https://github.com/trending"
+          headers = {
+              "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
+          }
+
+          try:
+              resp = requests.get(url, headers=headers, timeout=30)
+              soup = BeautifulSoup(resp.text, "html.parser")
+
+              articles = soup.select("article.Box-row")
+              results = []
+
+              for article in articles[:30]:  # 只看前30个
+                  try:
+                      # 获取项目名
+                      repo_link = article.select_one("h2 a")
+                      if not repo_link:
+                          continue
+                      repo_path = repo_link.get("href", "").strip("/")
+
+                      # 获取描述
+                      desc_elem = article.select_one("p")
+                      description = desc_elem.get_text().strip() if desc_elem else ""
+
+                      # 获取语言
+                      lang_elem = article.select_one("span[itemprop='programmingLanguage']")
+                      language = lang_elem.get_text().strip() if lang_elem else ""
+
+                      # 获取 stars
+                      stars_elem = article.select_one("a[href*='/stargazers']")
+                      stars = stars_elem.get_text().strip() if stars_elem else "0"
+
+                      # 检查是否匹配关键词
+                      full_text = (repo_path + " " + description + " " + language).lower()
+                      matched_keywords = [kw for kw in KEYWORDS if kw.lower() in full_text]
+
+                      if matched_keywords:
+                          repo_url = f"https://github.com/{repo_path}"
+                          results.append({
+                              "repo": repo_path,
+                              "url": repo_url,
+                              "description": description[:200],
+                              "language": language,
+                              "stars": stars,
+                              "matched": matched_keywords
+                          })
+                  except Exception as e:
+                      continue
+
+              # 输出结果
+              print(f"::set-output name=count::{len(results)}")
+              with open("trending_results.json", "w") as f:
+                  json.dump(results, f, ensure_ascii=False, indent=2)
+
+          except Exception as e:
+              print(f"Error: {e}")
+              print("::set-output name=count::0")
+              with open("trending_results.json", "w") as f:
+                  json.dump([], f)
+
+          EOF
+
+      - name: Send to Feishu
+        if: steps.fetch.outputs.count != '0'
+        run: |
+          python << 'EOF'
+          import json
+          import os
+          import requests
+
+          # 读取结果
+          with open("trending_results.json", "r") as f:
+              results = json.load(f)
+
+          if not results:
+              print("No matching results, skip notification")
+              exit(0)
+
+          # 飞书 Webhook URL（需要替换为你的机器人 Webhook）
+          # 获取环境变量或使用 secret
+          FEISHU_WEBHOOK = os.environ.get("FEISHU_WEBHOOK", "")
+          FEISHU_SECRET = os.environ.get("FEISHU_SECRET", "")
+
+          if not FEISHU_WEBHOOK:
+              print("FEISHU_WEBHOOK not set, skipping notification")
+              # 输出到日志供查看
+              print("Results:", json.dumps(results[:5], ensure_ascii=False, indent=2))
+              exit(0)
+
+          # 构建消息
+          items_text = ""
+          for i, item in enumerate(results[:10], 1):  # 最多10条
+              items_text += f"**{i}. [{item['repo']}]({item['url']})**\n"
+              items_text += f"   ⭐ {item['stars']} | {item['language']}\n"
+              if item['description']:
+                  items_text += f"   {item['description'][:80]}...\n"
+              items_text += f"   🏷️ {', '.join(item['matched'])}\n\n"
+
+          message = {
+              "msg_type": "interactive",
+              "card": {
+                  "header": {
+                      "title": {"tag": "plain_text", "content": "📅 GitHub Trending 精选（每日自动更新）"},
+                      "template": "purple"
+                  },
+                  "elements": [
+                      {
+                          "tag": "markdown",
+                          "content": f"**今日发现 {len(results)} 个相关项目**\n\n{items_text}"
+                      },
+                      {
+                          "tag": "hr"
+                      },
+                      {
+                          "tag": "note",
+                          "elements": [
+                              {"tag": "plain_text", "content": "由 GitHub Actions 自动抓取 | 关键词：iOS/Swift/HarmonyOS/AI/内容创作"}
+                          ]
+                      }
+                  ]
+              }
+          }
+
+          # 发送消息
+          response = requests.post(FEISHU_WEBHOOK, json=message)
+          print(f"Feishu response: {response.status_code}")
+          print(response.text)
+
+          EOF
+        env:
+          FEISHU_WEBHOOK: ${{ secrets.FEISHU_WEBHOOK }}
+          FEISHU_SECRET: ${{ secrets.FEISHU_SECRET }}
+
+      - name: Upload results as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: trending-results
+          path: trending_results.json
+          retention-days: 7
