@@ -1,0 +1,110 @@
+name: 📝 选题灵感
+description: 提交一个新的内容选题灵感
+title: "【选题】"
+labels: ["选题", "待审核"]
+assignees:
+  - vampirecarter
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 📌 选题基本信息
+
+  - type: input
+    id: topic
+    attributes:
+      label: 选题标题
+      description: 简洁有力的选题名称（一句话）
+      placeholder: "例如：如何在iOS App中实现积分掉落动画"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: 发布平台
+      description: 这个选题适合哪个平台
+      options:
+        - 小红书
+        - B站
+        - 微信公众号
+        - GitHub
+        - 抖音/视频号
+        - 多平台
+    validations:
+      required: true
+
+  - type: dropdown
+    id: content-type
+    attributes:
+      label: 内容形式
+      description: 适合什么样的内容形式
+      options:
+        - 教程/Tutorial
+        - 工具推荐
+        - 经验分享
+        - 产品测评
+        - 趋势分析
+        - 干货盘点
+        - 故事叙述
+    validations:
+      required: true
+
+  - type: dropdown
+    id: difficulty
+    attributes:
+      label: 制作难度
+      description: 预估内容制作难度
+      options:
+        - ⭐ 简单（30分钟内）
+        - ⭐⭐ 中等（1-2小时）
+        - ⭐⭐⭐ 复杂（半天+）
+        - ⭐⭐⭐⭐ 专业级（需要调研）
+
+  - type: textarea
+    id: outline
+    attributes:
+      label: 内容大纲
+      description: 列出主要内容结构（3-5个要点）
+      placeholder: |
+        1. 开头：引入问题/场景
+        2. 核心：步骤1/2/3...
+        3. 结尾：总结+互动引导
+
+  - type: textarea
+    id: source
+    attributes:
+      label: 素材/参考来源
+      description: 相关的GitHub项目/文章/视频链接
+      placeholder: |
+        - https://github.com/xxx
+        - https://youtube.com/xxx
+
+  - type: textarea
+    id: tags
+    attributes:
+      label: 相关话题标签
+      description: 适合的话题标签
+      placeholder: |
+        #iOS开发 #Swift #积分系统 #育儿App
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: 优先级
+      description: 内容紧急程度
+      options:
+        - 🔥 紧急（立即制作）
+        - ⚡ 高（本週完成）
+        - 📅 中（本月完成）
+        - 📝 低（有空再做）
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: 备注/想法
+      description: 任何额外的想法或注意事项
+      placeholder: |
+        - 可以结合xxx一起做系列
+        - 需要找特定素材...
